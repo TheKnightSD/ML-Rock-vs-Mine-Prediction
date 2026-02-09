@@ -1,126 +1,98 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Sonar Object Prediction</title>
+    <meta charset="UTF-8">
+    <title>Sonar Scan Game</title>
 
     <style>
         body {
             margin: 0;
-            padding: 0;
             height: 100vh;
             font-family: Arial, sans-serif;
-
-            background-image: url("/static/bg1.jpeg");
+            background-image: url("{{ url_for('static', filename='bg1.jpeg') }}");
             background-size: cover;
             background-position: center;
-            background-repeat: no-repeat;
-
             display: flex;
             justify-content: center;
             align-items: center;
+            color: white;
         }
 
         .overlay {
             position: absolute;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.55);
+            inset: 0;
+            background: rgba(0,0,0,0.65);
         }
 
-        .card {
+        .game-card {
             position: relative;
-            width: 760px;
-            padding: 40px;
-            border-radius: 16px;
-            text-align: center;
-            background: rgba(237, 241, 240, 0.92);
-            box-shadow: 0 18px 45px rgba(0,0,0,0.45);
             z-index: 2;
+            width: 420px;
+            padding: 35px;
+            text-align: center;
+            background: rgba(0,0,0,0.75);
+            border-radius: 16px;
+            box-shadow: 0 0 40px rgba(0,0,0,0.9);
         }
 
         h1 {
-            margin-top: 0;
-            color: #1f4037;
+            margin-bottom: 10px;
             font-size: 32px;
         }
 
         p {
-            color: #444;
-            font-size: 15px;
+            margin-top: 0;
+            font-size: 14px;
+            color: #ccc;
         }
 
         .btn-group {
-            margin: 22px 0;
+            margin: 25px 0;
         }
 
-        .btn-group button {
+        button {
             padding: 12px 26px;
-            margin: 6px;
-            background: #1f4037;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 15px;
-        }
-
-        .btn-group button:hover {
-            background: #145c4c;
-        }
-
-        .hidden {
-            display: none;
-        }
-
-        textarea {
-            width: 100%;
-            height: 170px;
-            padding: 14px;
-            font-size: 15px;
-            margin-top: 12px;
-            border-radius: 8px;
-            border: 1px solid #bbb;
-            background: #2e2e2e;
-            color: #ffffff;
-            resize: none;
-        }
-
-        input[type="file"] {
-            margin-top: 12px;
-        }
-
-        .predict-btn {
-            margin-top: 20px;
-            padding: 13px 34px;
-            background: #8b0000;
-            color: #fff;
-            border: none;
-            border-radius: 8px;
             font-size: 16px;
+            border: none;
+            border-radius: 8px;
             cursor: pointer;
+            margin: 8px;
+            font-weight: bold;
         }
 
-        .predict-btn:hover {
-            background: #5c0101;
+        .scan-btn {
+            background: #00c6ff;
+            color: #000;
         }
 
-        h3 {
-            margin-top: 26px;
+        .scan-btn:hover {
+            background: #0099cc;
+        }
+
+        .reset-btn {
+            background: #ff4d4d;
+            color: white;
+        }
+
+        .reset-btn:hover {
+            background: #cc0000;
+        }
+
+        #result {
+            margin-top: 18px;
             font-size: 24px;
-            color: #1f4037;
         }
 
-        .footer {
-            margin-top: 14px;
+        #score {
+            margin-top: 10px;
+            font-size: 20px;
+            color: #00ffcc;
+        }
+
+        .hint {
+            margin-top: 18px;
             font-size: 12px;
-            color: #666;
-        }
-
-        @media (max-width: 768px) {
-            .card {
-                width: 92%;
-                padding: 26px;
-            }
+            color: #aaa;
         }
     </style>
 </head>
@@ -129,57 +101,44 @@
 
 <div class="overlay"></div>
 
-<div class="card">
-    <h1>Sonar <b>Mine</b> vs <b>Rock</b> Prediction</h1>
-    <p>Select input method to classify Mine or Rock</p>
+<div class="game-card">
+    <h1>🌊 Sonar Scan Game</h1>
+    <p>Detect underwater objects using sonar</p>
 
     <div class="btn-group">
-        <button onclick="showFile()">📁 Upload CSV</button>
-        <button onclick="showManual()">✍️ Manual Paste</button>
+        <button class="scan-btn" onclick="scan()">Scan Ocean</button>
+        <button class="reset-btn" onclick="resetGame()">Reset Game</button>
     </div>
 
-    <!-- CSV FORM -->
-    <form action="/predict_file" method="post" enctype="multipart/form-data"
-          id="fileForm" class="hidden">
-        <input type="file" name="file" required>
-        <br>
-        <button class="predict-btn" type="submit">Predict</button>
-    </form>
+    <div id="result">Click “Scan Ocean” to start</div>
+    <div id="score">Score: 0</div>
 
-    <!-- MANUAL FORM -->
-    <form action="/predict_manual" method="post" id="manualForm" class="hidden">
-        <textarea name="manual_data"
-                  placeholder="Paste exactly 60 comma-separated sonar values here..."></textarea>
-        <button class="predict-btn" type="submit">Predict</button>
-    </form>
-
-    {% if prediction %}
-        <h3 id="predictionResult">Prediction: {{ prediction }}</h3>
-    {% endif %}
-
-    <div class="footer">
-        ML + Flask Sonar Classification System
+    <div class="hint">
+        Mine 💣 = +10 points <br>
+        Rock 🪨 = 0 points
     </div>
 </div>
 
 <script>
-function resetPrediction() {
-    const result = document.getElementById("predictionResult");
-    if (result) {
-        result.style.display = "none";
-    }
+function scan() {
+    fetch("/scan")
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById("result").innerText =
+                "Detected: " + data.result;
+            document.getElementById("score").innerText =
+                "Score: " + data.score;
+        });
 }
 
-function showFile() {
-    resetPrediction();
-    document.getElementById("fileForm").classList.remove("hidden");
-    document.getElementById("manualForm").classList.add("hidden");
-}
-
-function showManual() {
-    resetPrediction();
-    document.getElementById("manualForm").classList.remove("hidden");
-    document.getElementById("fileForm").classList.add("hidden");
+function resetGame() {
+    fetch("/reset")
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById("result").innerText = "Game Reset";
+            document.getElementById("score").innerText =
+                "Score: " + data.score;
+        });
 }
 </script>
 

@@ -1,63 +1,57 @@
-from flask import Flask, request, render_template
-import pandas as pd
+from flask import Flask, render_template, jsonify
 import numpy as np
 import pickle
-import os   
+import random
 
 app = Flask(__name__)
 
-# Load model and scaler
+# Load ML components
 model = pickle.load(open("sonar_model.pkl", "rb"))
 scaler = pickle.load(open("scaler.pkl", "rb"))
+
+# Global score
+score = 0
 
 @app.route("/")
 def home():
     return render_template("index.html")
 
-@app.route("/predict_file", methods=["POST"])
-def predict_file():
-    try:
-        file = request.files["file"]
-        data = pd.read_csv(file, header=None, encoding="latin-1")
-        values = data.values.flatten()
+@app.route("/scan", methods=["GET"])
+def scan_ocean():
+    global score
 
-        if len(values) != 60:
-            return render_template(
-                "index.html",
-                prediction=f"Error: Expected 60 values, got {len(values)}"
-            )
+    # -------- GAME PROBABILITY LOGIC --------
+    # 70% chance Rock
+    # 30% chance Mine (validated by ML)
 
-        input_scaled = scaler.transform(values.reshape(1, -1))
-        pred = model.predict(input_scaled)
+    chance = random.random()
 
-        result = "Mine 💣" if pred[0] == 0 else "Rock 🪨"
-        return render_template("index.html", prediction=result)
+    if chance < 0.7:
+        # Mostly Rock
+        result = "Rock 🪨"
 
-    except Exception as e:
-        return render_template("index.html", prediction=f"Invalid CSV file")
+    else:
+        # ML-based Mine check
+        values = np.array([random.random() for _ in range(60)]).reshape(1, -1)
+        values_scaled = scaler.transform(values)
+        prediction = model.predict(values_scaled)[0]
 
-@app.route("/predict_manual", methods=["POST"])
-def predict_manual():
-    try:
-        raw = request.form["manual_data"]
-        values = [float(x.strip()) for x in raw.split(",") if x.strip()]
+        if prediction == 0:
+            result = "Mine 💣"
+            score += 10
+        else:
+            result = "Rock 🪨"
 
-        if len(values) != 60:
-            return render_template(
-                "index.html",
-                prediction=f"Error: Expected 60 values, got {len(values)}"
-            )
+    return jsonify({
+        "result": result,
+        "score": score
+    })
 
-        input_scaled = scaler.transform(np.array(values).reshape(1, -1))
-        pred = model.predict(input_scaled)
+@app.route("/reset", methods=["GET"])
+def reset_game():
+    global score
+    score = 0
+    return jsonify({"message": "Game reset", "score": score})
 
-        result = "Mine 💣" if pred[0] == 0 else "Rock 🪨"
-        return render_template("index.html", prediction=result)
-
-    except Exception as e:
-        return render_template("index.html", prediction="Invalid input values")
-
-# ✅ RENDER COMPATIBLE RUN
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(debug=True)
