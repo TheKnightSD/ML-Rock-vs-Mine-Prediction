@@ -1,1 +1,4 @@
 Project1 
+env/
+__pycache__/
+*.pkl
